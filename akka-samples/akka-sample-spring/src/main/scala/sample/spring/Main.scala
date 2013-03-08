@@ -7,8 +7,8 @@ import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 import akka.japi.Creator
 import akka.pattern.ask
 import akka.util.Timeout
-import org.springframework.context.support.{ AbstractApplicationContext, ClassPathXmlApplicationContext }
-import org.springframework.context.{ ApplicationContext, ApplicationContextAware }
+import org.springframework.context.support.ClassPathXmlApplicationContext
+import org.springframework.context.{ ApplicationContext, ApplicationContextAware, ConfigurableApplicationContext }
 import scala.beans.BeanProperty
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -36,13 +36,12 @@ class SpringBridge(system: ActorSystem) extends ApplicationContextAware {
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val context: AbstractApplicationContext = new ClassPathXmlApplicationContext("spring.xml")
+    val context: ConfigurableApplicationContext = new ClassPathXmlApplicationContext("spring.xml")
     val bridge = context.getBean("spring-bridge", classOf[SpringBridge])
 
+    implicit val timeout = Timeout(5.seconds)
     val hi = bridge.ref("hi-ref")
     val hello = bridge.ref("hello-ref")
-
-    implicit val timeout = Timeout(5.seconds)
     Await.result(hi ? Greet, 5.seconds)
     Await.result(hello ? Greet, 5.seconds)
 
