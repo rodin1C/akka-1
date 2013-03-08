@@ -345,7 +345,7 @@ object AkkaBuild extends Build {
     id = "akka-samples",
     base = file("akka-samples"),
     settings = parentSettings,
-    aggregate = Seq(camelSample, fsmSample, helloSample, helloKernelSample, remoteSample, clusterSample, multiNodeSample)
+    aggregate = Seq(camelSample, fsmSample, helloSample, helloKernelSample, springSample, remoteSample, clusterSample, multiNodeSample)
   )
 
   lazy val camelSample = Project(
@@ -374,6 +374,13 @@ object AkkaBuild extends Build {
     base = file("akka-samples/akka-sample-hello-kernel"),
     dependencies = Seq(kernel),
     settings = sampleSettings
+  )
+
+  lazy val springSample = Project(
+    id = "akka-sample-spring",
+    base = file("akka-samples/akka-sample-spring"),
+    dependencies = Seq(actor),
+    settings = sampleSettings ++ Seq(libraryDependencies ++= Dependencies.springSample)
   )
 
   lazy val remoteSample = Project(
@@ -875,6 +882,9 @@ object Dependencies {
     // Camel Sample
     val camelJetty  = "org.apache.camel"              % "camel-jetty"                  % camelCore.revision // ApacheV2
 
+    // Spring Sample
+    val springContext = "org.springframework"         % "spring-context"               % "3.2.1.RELEASE"    // ApacheV2
+
     // Cluster Sample
     val sigar       = "org.fusesource"                % "sigar"                        % "1.6.4"            // ApacheV2
 
@@ -930,6 +940,8 @@ object Dependencies {
   val camel = Seq(camelCore, Test.scalatest, Test.junit, Test.mockito, Test.logback, Test.commonsIo)
 
   val camelSample = Seq(camelJetty)
+
+  val springSample = Seq(springContext)
 
   val osgi = Seq(osgiCore, osgiCompendium, Test.logback, Test.commonsIo, Test.pojosr, Test.tinybundles, Test.scalatest, Test.junit)
 

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+           http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+  <bean id="actor-system"
+    class="akka.actor.ActorSystem" factory-method="create"
+    destroy-method="shutdown" scope="singleton">
+  </bean>
+
+  <bean id="spring-bridge" class="sample.spring.SpringBridge" scope="singleton">
+    <constructor-arg name="system" ref="actor-system"/>
+  </bean>
+
+  <bean id="hello-ref" class="akka.actor.ActorRef" factory-bean="spring-bridge" factory-method="actorOf" scope="singleton">
+    <constructor-arg name="actorBeanRef"><idref bean="hello-actor"/></constructor-arg>
+  </bean>
+
+  <bean id="hello-actor" class="sample.spring.GreetingActor" scope="prototype">
+    <constructor-arg name="greeting" value="Hello"/>
+  </bean>
+
+  <bean id="hi-ref" class="akka.actor.ActorRef" factory-bean="spring-bridge" factory-method="actorOf" scope="singleton">
+    <constructor-arg name="actorBeanRef"><idref bean="hi-actor"/></constructor-arg>
+    <constructor-arg name="name" value="hi"/>
+  </bean>
+
+  <bean id="hi-actor" class="sample.spring.GreetingActor" scope="prototype">
+    <constructor-arg name="greeting" value="Hi"/>
+  </bean>
+
+</beans>
