@@ -21,6 +21,10 @@ class SpringBridge(system: ActorSystem) extends ApplicationContextAware {
     def create() = applicationContext.getBean(name, classOf[Actor])
   }
 
+  def ref(beanRef: String) = {
+    applicationContext.getBean(beanRef, classOf[ActorRef])
+  }
+
   def actorOf(actorBeanRef: String) = {
     system.actorOf(Props(actorBeanCreator(actorBeanRef)))
   }
@@ -33,9 +37,10 @@ class SpringBridge(system: ActorSystem) extends ApplicationContextAware {
 object Main {
   def main(args: Array[String]): Unit = {
     val context: AbstractApplicationContext = new ClassPathXmlApplicationContext("spring.xml")
+    val bridge = context.getBean("spring-bridge", classOf[SpringBridge])
 
-    val hi = context.getBean("hi-ref", classOf[ActorRef])
-    val hello = context.getBean("hello-ref", classOf[ActorRef])
+    val hi = bridge.ref("hi-ref")
+    val hello = bridge.ref("hello-ref")
 
     implicit val timeout = Timeout(5.seconds)
     Await.result(hi ? Greet, 5.seconds)
