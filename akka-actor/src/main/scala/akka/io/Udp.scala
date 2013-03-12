@@ -4,9 +4,9 @@
 package akka.io
 
 import java.net.DatagramSocket
+import akka.util.Helpers.Requiring
 import akka.io.Inet.{ SoJavaFactories, SocketOption }
 import com.typesafe.config.Config
-import akka.actor.{ Props, ActorSystemImpl }
 
 object Udp {
 
@@ -26,23 +26,15 @@ object Udp {
   private[io] class UdpSettings(_config: Config) extends SelectionHandlerSettings(_config) {
     import _config._
 
-    val NrOfSelectors = getInt("nr-of-selectors")
-    val DirectBufferSize = getIntBytes("direct-buffer-size")
+    val NrOfSelectors = getInt("nr-of-selectors").
+      requiring(_ > 0, "nr-of-selectors must be > 0")
+    val DirectBufferSize = getBytes("direct-buffer-size").
+      requiring(_ < Int.MaxValue, "direct-buffer-size must be < 2 GiB").toInt
     val MaxDirectBufferPoolSize = getInt("direct-buffer-pool-limit")
     val BatchReceiveLimit = getInt("receive-throughput")
-
     val ManagementDispatcher = getString("management-dispatcher")
 
-    // FIXME: Use new requiring
-    require(NrOfSelectors > 0, "nr-of-selectors must be > 0")
-
     override val MaxChannelsPerSelector = if (MaxChannels == -1) -1 else math.max(MaxChannels / NrOfSelectors, 1)
-
-    private[this] def getIntBytes(path: String): Int = {
-      val size = getBytes(path)
-      require(size < Int.MaxValue, s"$path must be < 2 GiB")
-      size.toInt
-    }
   }
 }
 

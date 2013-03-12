@@ -62,32 +62,28 @@ class UdpConnExt(system: ExtendedActorSystem) extends IO.Extension {
 
   val settings: UdpSettings = new UdpSettings(system.settings.config.getConfig("akka.io.udp-fire-and-forget"))
 
-  val manager: ActorRef = {
-    system.asInstanceOf[ActorSystemImpl].systemActorOf(
-      props = Props(new UdpConnManager(this)),
-      name = "IO-UDP-CONN")
-  }
-
   val bufferPool: BufferPool = new DirectByteBufferPool(settings.DirectBufferSize, settings.MaxDirectBufferPoolSize)
 
+  val manager: ActorRef =
+    system.asInstanceOf[ActorSystemImpl].systemActorOf(props = Props(new UdpConnManager(this)), name = "IO-UDP-CONN")
 }
 
 /**
  * Java API: factory methods for the message types used when communicating with the UdpConn service.
  */
 object UdpConnMessage {
-  import language.implicitConversions
+  import akka.japi.Util.immutableSeq
   import UdpConn._
 
-  def connect(handler: ActorRef,
-              remoteAddress: InetSocketAddress,
-              localAddress: InetSocketAddress,
-              options: JIterable[SocketOption]): Command = Connect(handler, remoteAddress, Some(localAddress), options)
-  def connect(handler: ActorRef,
-              remoteAddress: InetSocketAddress,
-              options: JIterable[SocketOption]): Command = Connect(handler, remoteAddress, None, options)
-  def connect(handler: ActorRef,
-              remoteAddress: InetSocketAddress): Command = Connect(handler, remoteAddress, None, Nil)
+  def connect(handler: ActorRef, remoteAddress: InetSocketAddress): Command =
+    Connect(handler, remoteAddress, None, Nil)
+
+  def connect(handler: ActorRef, remoteAddress: InetSocketAddress, options: JIterable[SocketOption]): Command =
+    Connect(handler, remoteAddress, None, immutableSeq(options))
+
+  def connect(handler: ActorRef, remoteAddress: InetSocketAddress,
+              localAddress: InetSocketAddress, options: JIterable[SocketOption]): Command =
+    Connect(handler, remoteAddress, Some(localAddress), immutableSeq(options))
 
   def send(data: ByteString): Command = Send(data)
   def send(data: ByteString, ack: AnyRef): Command = Send(data, ack)
@@ -99,9 +95,4 @@ object UdpConnMessage {
 
   def stopReading: Command = StopReading
   def resumeReading: Command = ResumeReading
-
-  implicit private def fromJava[T](coll: JIterable[T]): immutable.Traversable[T] = {
-    import scala.collection.JavaConverters._
-    coll.asScala.to
-  }
 }
