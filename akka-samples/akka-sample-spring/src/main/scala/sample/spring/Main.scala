@@ -7,47 +7,41 @@ import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 import akka.japi.Creator
 import akka.pattern.ask
 import akka.util.Timeout
+import org.springframework.beans.factory.ObjectFactory
+import org.springframework.beans.factory.config.{ ConfigurableBeanFactory, Scope }
 import org.springframework.context.support.ClassPathXmlApplicationContext
 import org.springframework.context.{ ApplicationContext, ApplicationContextAware, ConfigurableApplicationContext }
 import scala.beans.BeanProperty
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class SpringBridge(system: ActorSystem) extends ApplicationContextAware {
-  @BeanProperty
-  var applicationContext: ApplicationContext = _
-
-  private def actorBeanCreator(name: String) = new Creator[Actor] {
-    def create() = applicationContext.getBean(name, classOf[Actor])
-  }
-
-  def ref(beanRef: String) = {
-    applicationContext.getBean(beanRef, classOf[ActorRef])
-  }
-
-  def actorOf(actorBeanRef: String) = {
-    system.actorOf(Props(actorBeanCreator(actorBeanRef)))
-  }
-
-  def actorOf(actorBeanRef: String, name: String) = {
-    system.actorOf(Props(actorBeanCreator(actorBeanRef)), name)
-  }
-}
+import akka.spring.{ ScopedActor, SpringHelper }
 
 object Main {
   def main(args: Array[String]): Unit = {
     val context: ConfigurableApplicationContext = new ClassPathXmlApplicationContext("spring.xml")
-    val bridge = context.getBean("spring-bridge", classOf[SpringBridge])
+    // TODO: Programmatically register ActorScope
+    // TODO: Maybe ensure that Actors can only have prototype scope, since refs should not be held
+    try {
+      val system = ActorSystem()
+      try {
+        implicit val timeout = Timeout(2.seconds)
 
-    implicit val timeout = Timeout(5.seconds)
-    val hi = bridge.ref("hi-ref")
-    val hello = bridge.ref("hello-ref")
-    Await.result(hi ? Greet, 5.seconds)
-    Await.result(hello ? Greet, 5.seconds)
+        val hi = SpringHelper.createSimpleSpringConfiguredActor(system, context, "hi-actor")
+        val hello = SpringHelper.createSimpleSpringConfiguredActor(system, context, "hello-actor")
+        Await.result(hi ? Greet, 1.second)
+        Await.result(hello ? Greet, 1.second)
 
-    context.close()
+        val resourceCtor = SpringHelper.createSimpleSpringConfiguredActor(system, context, "resource-ctor-actor")
+        val resourceProp = SpringHelper.createSimpleSpringConfiguredActor(system, context, "resource-prop-actor")
+        Await.result(resourceCtor ? ResourcePing, 1.second)
+        Await.result(resourceProp ? ResourcePing, 1.second)
+      } finally system.shutdown()
+    } finally context.close()
   }
 }
+
+// Testing simple constructor dependency injection
 
 case object Greet
 case object GreetDone
@@ -58,5 +52,30 @@ class GreetingActor(greeting: String) extends Actor {
       println(s"$greeting world!")
       sender ! GreetDone
     }
+  }
+}
+
+// Testing injecting resources into an actor using the 'actor' scope for cleanup
+
+class Resource {
+  def destroy() { println("Destroying resource") }
+}
+
+case object ResourcePing
+case class ResourcePong(resource: Resource)
+
+// Create with constructor-based dependency injection
+class ResourceHolderCtor(resource: Resource) extends ScopedActor {
+  def receive = {
+    case _ ⇒ sender ! ResourcePong(resource)
+  }
+}
+
+// Create with property-based dependency injection
+class ResourceHolderProp extends ScopedActor {
+  @BeanProperty
+  var resource: Resource = _
+  def receive = {
+    case ResourcePing ⇒ sender ! ResourcePong(resource)
   }
 }
