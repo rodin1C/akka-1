@@ -26,7 +26,7 @@ object ReliableProxy {
         } else {
           log.debug("received msg of {} from {} with wrong serial", msg.asInstanceOf[AnyRef].getClass, snd)
         }
-      case Terminated(`target`) ⇒ context stop self
+      case Terminated(a) if a.path == target.path ⇒ context stop self
     }
   }
 

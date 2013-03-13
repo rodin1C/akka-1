@@ -180,9 +180,9 @@ the whole lifetime of the actor. In the case of a local actor reference, the
 named actor needs to exist before the lookup, or else the acquired reference
 will be an :class:`EmptyLocalActorRef`. This will be true even if an actor with
 that exact path is created after acquiring the actor reference. For remote actor
-references the behaviour is different and sending messages to such a reference
-will under the hood look up the actor by path on the remote system for every
-message send.
+references acquired with `actorFor` the behaviour is different and sending messages 
+to such a reference will under the hood look up the actor by path on the remote
+system for every message send.
 
 Absolute vs. Relative Paths
 ```````````````````````````

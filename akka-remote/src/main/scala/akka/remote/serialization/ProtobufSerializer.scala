@@ -19,8 +19,8 @@ object ProtobufSerializer {
    */
   def serializeActorRef(ref: ActorRef): ActorRefProtocol = {
     val identifier: String = Serialization.currentTransportAddress.value match {
-      case null    ⇒ ref.path.toString
-      case address ⇒ ref.path.toStringWithAddress(address)
+      case null    ⇒ ref.path.toRawString
+      case address ⇒ ref.path.toRawStringWithAddress(address)
     }
     ActorRefProtocol.newBuilder.setPath(identifier).build
   }

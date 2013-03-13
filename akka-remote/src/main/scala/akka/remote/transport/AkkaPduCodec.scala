@@ -182,7 +182,7 @@ private[remote] object AkkaPduProtobufCodec extends AkkaPduCodec {
 
   private def serializeActorRef(defaultAddress: Address, ref: ActorRef): ActorRefProtocol = {
     ActorRefProtocol.newBuilder.setPath(
-      if (ref.path.address.host.isDefined) ref.path.toString else ref.path.toStringWithAddress(defaultAddress)).build()
+      if (ref.path.address.host.isDefined) ref.path.toRawString else ref.path.toRawStringWithAddress(defaultAddress)).build()
   }
 
   private def serializeAddress(address: Address): Option[AddressProtocol] = {

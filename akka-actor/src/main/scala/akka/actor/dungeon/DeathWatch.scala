@@ -4,22 +4,22 @@
 
 package akka.actor.dungeon
 
-import akka.actor.{ Terminated, InternalActorRef, ActorRef, ActorRefScope, ActorCell, Actor, Address, AddressTerminated }
+import akka.actor.{ Terminated, InternalActorRef, ActorPath, ActorRef, ActorRefScope, ActorCell, Actor, Address, AddressTerminated }
 import akka.dispatch.{ ChildTerminated, Watch, Unwatch }
 import akka.event.Logging.{ Warning, Error, Debug }
 import scala.util.control.NonFatal
 
 private[akka] trait DeathWatch { this: ActorCell ⇒
 
-  private var watching: Set[ActorRef] = ActorCell.emptyActorRefSet
-  private var watchedBy: Set[ActorRef] = ActorCell.emptyActorRefSet
+  private var watching: Map[ActorPath, ActorRef] = ActorCell.emptyActorRefMap
+  private var watchedBy: Map[ActorPath, ActorRef] = ActorCell.emptyActorRefMap
 
   override final def watch(subject: ActorRef): ActorRef = subject match {
     case a: InternalActorRef ⇒
-      if (a != self && !watching.contains(a)) {
+      if (a.path != self.path && !watching.contains(a.path)) {
         maintainAddressTerminatedSubscription(a) {
           a.sendSystemMessage(Watch(a, self)) // ➡➡➡ NEVER SEND THE SAME SYSTEM MESSAGE OBJECT TO TWO ACTORS ⬅⬅⬅
-          watching += a
+          watching += (a.path -> a)
         }
       }
       a
@@ -27,10 +27,10 @@ private[akka] trait DeathWatch { this: ActorCell ⇒
 
   override final def unwatch(subject: ActorRef): ActorRef = subject match {
     case a: InternalActorRef ⇒
-      if (a != self && watching.contains(a)) {
+      if (a.path != self.path && watching.contains(a.path)) {
         maintainAddressTerminatedSubscription(a) {
           a.sendSystemMessage(Unwatch(a, self)) // ➡➡➡ NEVER SEND THE SAME SYSTEM MESSAGE OBJECT TO TWO ACTORS ⬅⬅⬅
-          watching -= a
+          watching -= a.path
         }
       }
       a
@@ -41,9 +41,9 @@ private[akka] trait DeathWatch { this: ActorCell ⇒
    * it will be propagated to user's receive.
    */
   protected def watchedActorTerminated(t: Terminated): Unit =
-    if (watching.contains(t.actor)) {
+    if (watching.contains(t.actor.path)) {
       maintainAddressTerminatedSubscription(t.actor) {
-        watching -= t.actor
+        watching -= t.actor.path
       }
       receiveMessage(t)
     }
@@ -68,9 +68,9 @@ private[akka] trait DeathWatch { this: ActorCell ⇒
          *
          * If the remote watchers are notified first, then the mailbox of the Remoting will guarantee the correct order.
          */
-        watchedBy foreach sendTerminated(ifLocal = false)
-        watchedBy foreach sendTerminated(ifLocal = true)
-      } finally watchedBy = ActorCell.emptyActorRefSet
+        watchedBy foreach { case (_, a) ⇒ sendTerminated(ifLocal = false)(a) }
+        watchedBy foreach { case (_, a) ⇒ sendTerminated(ifLocal = true)(a) }
+      } finally watchedBy = ActorCell.emptyActorRefMap
     }
   }
 
@@ -78,22 +78,22 @@ private[akka] trait DeathWatch { this: ActorCell ⇒
     if (!watching.isEmpty) {
       try {
         watching foreach { // ➡➡➡ NEVER SEND THE SAME SYSTEM MESSAGE OBJECT TO TWO ACTORS ⬅⬅⬅
-          case watchee: InternalActorRef ⇒ watchee.sendSystemMessage(Unwatch(watchee, self))
+          case (_, watchee: InternalActorRef) ⇒ watchee.sendSystemMessage(Unwatch(watchee, self))
         }
       } finally {
-        watching = ActorCell.emptyActorRefSet
+        watching = ActorCell.emptyActorRefMap
         unsubscribeAddressTerminated()
       }
     }
   }
 
   protected def addWatcher(watchee: ActorRef, watcher: ActorRef): Unit = {
-    val watcheeSelf = watchee == self
-    val watcherSelf = watcher == self
+    val watcheeSelf = watchee.path == self.path
+    val watcherSelf = watcher.path == self.path
 
     if (watcheeSelf && !watcherSelf) {
-      if (!watchedBy.contains(watcher)) maintainAddressTerminatedSubscription(watcher) {
-        watchedBy += watcher
+      if (!watchedBy.contains(watcher.path)) maintainAddressTerminatedSubscription(watcher) {
+        watchedBy += (watcher.path -> watcher)
         if (system.settings.DebugLifecycle) publish(Debug(self.path.toString, clazz(actor), "now monitoring " + watcher))
       }
     } else if (!watcheeSelf && watcherSelf) {
@@ -104,12 +104,12 @@ private[akka] trait DeathWatch { this: ActorCell ⇒
   }
 
   protected def remWatcher(watchee: ActorRef, watcher: ActorRef): Unit = {
-    val watcheeSelf = watchee == self
-    val watcherSelf = watcher == self
+    val watcheeSelf = watchee.path == self.path
+    val watcherSelf = watcher.path == self.path
 
     if (watcheeSelf && !watcherSelf) {
-      if (watchedBy.contains(watcher)) maintainAddressTerminatedSubscription(watcher) {
-        watchedBy -= watcher
+      if (watchedBy.contains(watcher.path)) maintainAddressTerminatedSubscription(watcher) {
+        watchedBy -= watcher.path
         if (system.settings.DebugLifecycle) publish(Debug(self.path.toString, clazz(actor), "stopped monitoring " + watcher))
       }
     } else if (!watcheeSelf && watcherSelf) {
@@ -122,7 +122,7 @@ private[akka] trait DeathWatch { this: ActorCell ⇒
   protected def addressTerminated(address: Address): Unit = {
     // cleanup watchedBy since we know they are dead
     maintainAddressTerminatedSubscription() {
-      for (a ← watchedBy; if a.path.address == address) watchedBy -= a
+      for ((p, _) ← watchedBy; if p.address == address) watchedBy -= p
     }
 
     // send Terminated to self for all matching subjects
@@ -131,7 +131,7 @@ private[akka] trait DeathWatch { this: ActorCell ⇒
     // When a parent is watching a child and it terminates due to AddressTerminated
     // it is removed by sending ChildTerminated to support immediate creation of child
     // with same name.
-    for (a ← watching; if a.path.address == address) {
+    for ((p, a) ← watching; if p.address == address) {
       childrenRefs.getByRef(a) foreach { _ ⇒ self.sendSystemMessage(ChildTerminated(a)) }
       self ! Terminated(a)(existenceConfirmed = false, addressTerminated = true)
     }
@@ -151,7 +151,8 @@ private[akka] trait DeathWatch { this: ActorCell ⇒
     }
 
     if (isNonLocal(change)) {
-      def hasNonLocalAddress: Boolean = ((watching exists isNonLocal) || (watchedBy exists isNonLocal))
+      def hasNonLocalAddress: Boolean =
+        ((watching.exists { case (_, a) ⇒ isNonLocal(a) }) || (watchedBy.exists { case (_, a) ⇒ isNonLocal(a) }))
       val had = hasNonLocalAddress
       val result = block
       val has = hasNonLocalAddress

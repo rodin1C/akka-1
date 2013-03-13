@@ -171,8 +171,8 @@ package docs.serialization {
       // so either you need to supply your own,
       // or simply use the local path.
       val identifier: String = Serialization.currentTransportAddress.value match {
-        case null    ⇒ theActorRef.path.toString
-        case address ⇒ theActorRef.path.toStringWithAddress(address)
+        case null    ⇒ theActorRef.path.toRawString
+        case address ⇒ theActorRef.path.toRawStringWithAddress(address)
       }
       // Then just serialize the identifier however you like
 
@@ -192,7 +192,7 @@ package docs.serialization {
       }
 
       def serializeTo(ref: ActorRef, remote: Address): String =
-        ref.path.toStringWithAddress(ExternalAddress(theActorSystem).addressFor(remote))
+        ref.path.toRawStringWithAddress(ExternalAddress(theActorSystem).addressFor(remote))
       //#external-address
     }
 
@@ -207,7 +207,7 @@ package docs.serialization {
       }
 
       def serializeAkkaDefault(ref: ActorRef): String =
-        ref.path.toStringWithAddress(ExternalAddress(theActorSystem).addressForAkka)
+        ref.path.toRawStringWithAddress(ExternalAddress(theActorSystem).addressForAkka)
       //#external-address-default
     }
   }

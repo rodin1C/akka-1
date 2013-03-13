@@ -82,8 +82,8 @@ private[akka] sealed trait SystemMessage extends PossiblyHarmful with Serializab
 /**
  * INTERNAL API
  */
-@SerialVersionUID(-4836972106317757555L)
-private[akka] case class Create(uid: Int) extends SystemMessage // send to self from Dispatcher.register
+@SerialVersionUID(3L)
+private[akka] case class Create() extends SystemMessage // send to self from Dispatcher.register
 /**
  * INTERNAL API
  */
