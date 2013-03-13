@@ -15,6 +15,8 @@ import scala.beans.BeanProperty
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+import javax.inject._
+
 import akka.spring.{ ScopedActor, SpringHelper }
 
 object Main {
@@ -32,8 +34,8 @@ object Main {
         Await.result(hi ? Greet, 1.second)
         Await.result(hello ? Greet, 1.second)
 
-        val resourceCtor = SpringHelper.createSimpleSpringConfiguredActor(system, context, "resource-ctor-actor")
-        val resourceProp = SpringHelper.createSimpleSpringConfiguredActor(system, context, "resource-prop-actor")
+        val resourceCtor = SpringHelper.createSimpleSpringConfiguredActor(system, context, classOf[ResourceHolderCtor])
+        val resourceProp = SpringHelper.createSimpleSpringConfiguredActor(system, context, classOf[ResourceHolderProp])
         Await.result(resourceCtor ? ResourcePing, 1.second)
         Await.result(resourceProp ? ResourcePing, 1.second)
       } finally system.shutdown()
@@ -65,15 +67,19 @@ case object ResourcePing
 case class ResourcePong(resource: Resource)
 
 // Create with constructor-based dependency injection
-class ResourceHolderCtor(resource: Resource) extends ScopedActor {
+@Named
+@org.springframework.context.annotation.Scope("prototype")
+class ResourceHolderCtor @Inject() (resource: Resource) extends ScopedActor {
   def receive = {
     case _ ⇒ sender ! ResourcePong(resource)
   }
 }
 
 // Create with property-based dependency injection
+@Named
+@org.springframework.context.annotation.Scope("prototype")
 class ResourceHolderProp extends ScopedActor {
-  @BeanProperty
+  @Inject @BeanProperty
   var resource: Resource = _
   def receive = {
     case ResourcePing ⇒ sender ! ResourcePong(resource)

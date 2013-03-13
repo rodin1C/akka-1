@@ -65,6 +65,13 @@ object SpringHelper {
     beanName: String): ActorRef = {
     arf.actorOf(propsWithScope(bf.getBean(beanName, classOf[Actor])))
   }
+
+  def createSimpleSpringConfiguredActor[T <: Actor](
+    arf: ActorRefFactory,
+    bf: BeanFactory,
+    beanClass: Class[T]): ActorRef = {
+    arf.actorOf(propsWithScope(bf.getBean(beanClass)))
+  }
 }
 
 /**
