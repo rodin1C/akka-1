@@ -20,56 +20,50 @@ import scala.concurrent.duration._
  * some actor configuration.
  */
 object SpringHelper {
-  def createSimpleSpringConfiguredActor(
-    arf: ActorRefFactory,
-    applicationContext: ApplicationContext,
-    beanName: String): ActorRef = {
-    createSpringConfiguredActor(arf, applicationContext, (bf: BeanFactory) ⇒ bf.getBean(beanName, classOf[Actor]), identity[Props])
-  }
 
-  def createSpringConfiguredActor(
-    arf: ActorRefFactory,
-    applicationContext: ApplicationContext,
-    getBean: BeanFactory ⇒ Actor,
-    propsTransform: Props ⇒ Props): ActorRef = {
+  def propsWithScope(creator: ⇒ Actor): Props = Props({
     val scopeAttrs = new ActorScopeAttributes
-    val springProps = Props({
-      scopeAttrs.within {
-        // We can only guarantee destruction callbacks will be called for
-        // actors that implement ScopedActor. Therefore we do not support
-        // destruction callbacks in the 'actor' scope for other types of
-        // actor.
-        //
-        // Before proceeding we need to examine the actor we've created and
-        // check if it's a ScopedActor. If it is, then we proceed normally.
-        // If not, then we need to make sure that destruction callbacks
-        // cannot happen.
-        //
-        // To prevent these callbacks we call `forbidDestructionCallbacks`
-        // on the scopeAttrs object. This will cause the object to throw
-        // an UnsupportedOperationException if there is even an attempt in the
-        // future to register a destruction callback.
-        //
-        // Unfortunately some destruction callbacks may have *already*
-        // been registered with the scopeAttrs object (by Spring, during construction).
-        // If this has happened then we immediately destroy the scope and throw an
-        // UnsupportedOperationException.
-        val actor = getBean(applicationContext)
-        actor match {
-          case scopedActor: ScopedActor ⇒ scopedActor.scopeAttrs = scopeAttrs
-          case _ ⇒ {
-            if (scopeAttrs.hasDestructionCallbacks) {
-              scopeAttrs.destroy()
-              throw new UnsupportedOperationException("Only ScopedActors support destruction of objects in the Spring 'actor' scope.")
-            } else {
-              scopeAttrs.forbidDestructionCallbacks()
-            }
+    scopeAttrs.within {
+      // We can only guarantee destruction callbacks will be called for
+      // actors that implement ScopedActor. Therefore we do not support
+      // destruction callbacks in the 'actor' scope for other types of
+      // actor.
+      //
+      // Before proceeding we need to examine the actor we've created and
+      // check if it's a ScopedActor. If it is, then we proceed normally.
+      // If not, then we need to make sure that destruction callbacks
+      // cannot happen.
+      //
+      // To prevent these callbacks we call `forbidDestructionCallbacks`
+      // on the scopeAttrs object. This will cause the object to throw
+      // an UnsupportedOperationException if there is even an attempt in the
+      // future to register a destruction callback.
+      //
+      // Unfortunately some destruction callbacks may have *already*
+      // been registered with the scopeAttrs object (by Spring, during construction).
+      // If this has happened then we immediately destroy the scope and throw an
+      // UnsupportedOperationException.
+      val actor = creator
+      actor match {
+        case scopedActor: ScopedActor ⇒ scopedActor.scopeAttrs = scopeAttrs
+        case _ ⇒ {
+          if (scopeAttrs.hasDestructionCallbacks) {
+            scopeAttrs.destroy()
+            throw new UnsupportedOperationException("Only ScopedActors support destruction of objects in the Spring 'actor' scope.")
+          } else {
+            scopeAttrs.forbidDestructionCallbacks()
           }
         }
-        actor
       }
-    })
-    arf.actorOf(propsTransform(springProps))
+      actor
+    }
+  })
+
+  def createSimpleSpringConfiguredActor(
+    arf: ActorRefFactory,
+    bf: BeanFactory,
+    beanName: String): ActorRef = {
+    arf.actorOf(propsWithScope(bf.getBean(beanName, classOf[Actor])))
   }
 }
 
