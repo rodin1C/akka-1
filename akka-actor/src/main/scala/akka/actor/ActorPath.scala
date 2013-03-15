@@ -6,6 +6,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import akka.japi.Util.immutableSeq
 import java.net.MalformedURLException
+import java.lang.{ StringBuilder ⇒ JStringBuilder }
 
 object ActorPath {
   /**
@@ -123,6 +124,8 @@ sealed trait ActorPath extends Comparable[ActorPath] with Serializable {
 
   /**
    * INTERNAL API
+   * Unique identifier of the actor. Used for distinguishing
+   * different incarnations of actors with same path (name elements).
    */
   private[akka] def uid: Int
 
@@ -219,46 +222,57 @@ final class ChildActorPath private[akka] (val parent: ActorPath, val name: Strin
     if (uid == this.uid) this
     else new ChildActorPath(parent, name, uid)
 
-  // TODO research whether this should be cached somehow (might be fast enough, but creates GC pressure)
-  /*
-   * idea: add one field which holds the total length (because that is known)
-   * so that only one String needs to be allocated before traversal; this is
-   * cheaper than any cache
-   */
-  override def toString: String = buildToString(new StringBuilder(32)).toString
+  override def toString: String = buildToString(new JStringBuilder(toStringLength)).toString
 
   override def toRawString: String = {
-    val sb = buildToString(new StringBuilder(32))
+    val sb = buildToString(new JStringBuilder(toStringLength + 12))
     appendUidFragment(sb).toString
   }
 
-  private def buildToString(sb: StringBuilder): StringBuilder = {
+  private def toStringLength: Int = toStringOffset + name.length
+
+  private val toStringOffset: Int = parent match {
+    case r: RootActorPath  ⇒ r.address.toString.length + r.name.length
+    case c: ChildActorPath ⇒ c.toStringOffset + c.name.length + 1
+  }
+
+  private def buildToString(sb: JStringBuilder): JStringBuilder = {
     @tailrec
-    def rec(p: ActorPath, s: StringBuilder): StringBuilder = p match {
-      case r: RootActorPath ⇒ s.insert(0, r.toString)
-      case _                ⇒ rec(p.parent, s.insert(0, '/').insert(0, p.name))
+    def rec(p: ActorPath): JStringBuilder = p match {
+      case r: RootActorPath ⇒
+        val addressStr = r.address.toString
+        sb.replace(0, addressStr.length, addressStr)
+        sb.replace(addressStr.length, addressStr.length + r.name.length, r.name)
+      case c: ChildActorPath ⇒
+        val offset = c.toStringOffset
+        sb.replace(offset, offset + c.name.length, c.name)
+        if (c ne this)
+          sb.replace(offset + c.name.length, offset + c.name.length + 1, "/")
+        rec(c.parent)
     }
-    rec(parent, sb.append(name))
+
+    sb.setLength(toStringLength)
+    rec(this)
   }
 
   override def toStringWithAddress(addr: Address): String =
-    buildToStringWithAddress(addr, new StringBuilder(32)).toString
+    buildToStringWithAddress(addr, new JStringBuilder(toStringLength)).toString
 
   override def toRawStringWithAddress(addr: Address): String = {
-    val sb = buildToStringWithAddress(addr, new StringBuilder(32))
+    val sb = buildToStringWithAddress(addr, new JStringBuilder(toStringLength + 12))
     appendUidFragment(sb).toString
   }
 
-  private def buildToStringWithAddress(addr: Address, sb: StringBuilder): StringBuilder = {
+  private def buildToStringWithAddress(addr: Address, sb: JStringBuilder): JStringBuilder = {
     @tailrec
-    def rec(p: ActorPath, s: StringBuilder): StringBuilder = p match {
+    def rec(p: ActorPath, s: JStringBuilder): JStringBuilder = p match {
       case r: RootActorPath ⇒ s.insert(0, r.toStringWithAddress(addr))
       case _                ⇒ rec(p.parent, s.insert(0, '/').insert(0, p.name))
     }
     rec(parent, sb.append(name))
   }
 
-  private def appendUidFragment(sb: StringBuilder): StringBuilder = {
+  private def appendUidFragment(sb: JStringBuilder): JStringBuilder = {
     if (uid == ActorCell.undefinedUid) sb
     else sb.append("#").append(uid)
   }

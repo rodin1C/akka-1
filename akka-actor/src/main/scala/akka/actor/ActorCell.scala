@@ -312,6 +312,8 @@ private[akka] object ActorCell {
   final val undefinedUid = 0
 
   @tailrec final def newUid(): Int = {
+    // Note that this uid is also used as hashCode in ActorRef, so be careful
+    // to not break hashing if you change the way uid is generated
     val uid = ThreadLocalRandom.current.nextInt()
     if (uid == undefinedUid) newUid
     else uid
@@ -396,10 +398,10 @@ private[akka] class ActorCell(
             case null                  ⇒ faultResume(inRespToFailure)
             case w: WaitingForChildren ⇒ w.enqueue(message)
           }
-        case Terminate()                  ⇒ terminate()
-        case Supervise(child, async, uid) ⇒ supervise(child, async, uid)
-        case ChildTerminated(child)       ⇒ todo = handleChildTerminated(child)
-        case NoMessage                    ⇒ // only here to suppress warning
+        case Terminate()             ⇒ terminate()
+        case Supervise(child, async) ⇒ supervise(child, async)
+        case ChildTerminated(child)  ⇒ todo = handleChildTerminated(child)
+        case NoMessage               ⇒ // only here to suppress warning
       }
     } catch handleNonFatalOrInterruptedException { e ⇒
       handleInvokeFailure(Nil, e)
@@ -521,7 +523,7 @@ private[akka] class ActorCell(
     }
   }
 
-  private def supervise(child: ActorRef, async: Boolean, uid: Int): Unit =
+  private def supervise(child: ActorRef, async: Boolean): Unit =
     if (!isTerminating) {
       // Supervise is the first thing we get from a new child, so store away the UID for later use in handleFailure()
       initChild(child) match {

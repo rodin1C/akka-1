@@ -47,7 +47,7 @@ final case class Address private (protocol: String, system: String, host: Option
    */
   @transient
   override lazy val toString: String = {
-    val sb = (new StringBuilder(protocol)).append("://").append(system)
+    val sb = (new java.lang.StringBuilder(protocol)).append("://").append(system)
 
     if (host.isDefined) sb.append('@').append(host.get)
     if (port.isDefined) sb.append(':').append(port.get)

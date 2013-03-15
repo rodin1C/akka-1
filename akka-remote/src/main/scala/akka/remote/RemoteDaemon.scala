@@ -58,10 +58,11 @@ private[akka] class RemoteSystemDaemon(
       import akka.actor.ActorCell._
       val (childName, uid) = splitNameAndUid(s)
       getChild(childName) match {
-        case ref if (ref eq null) || (uid != undefinedUid && uid != ref.path.uid) ⇒
+        case null ⇒
           val last = s.lastIndexOf('/')
           if (last == -1) (Nobody, n)
           else rec(s.substring(0, last), n + 1)
+        case ref if uid != undefinedUid && uid != ref.path.uid ⇒ (Nobody, n)
         case ref ⇒ (ref, n)
       }
     }

@@ -393,7 +393,7 @@ class SupervisorSpec extends AkkaSpec with BeforeAndAfterEach with ImplicitSende
         override def postRestart(reason: Throwable): Unit = testActor ! "parent restarted"
 
         def receive = {
-          case Terminated(a) if a.path == child.path ⇒ testActor ! "child terminated"
+          case Terminated(a) if a.path == child.path ⇒ testActor ! "child terminated" // FIXME case t @ Terminated(`child`) ticket #3156
           case l: TestLatch                          ⇒ child ! l
           case "test"                                ⇒ sender ! "green"
           case "testchild"                           ⇒ child forward "test"

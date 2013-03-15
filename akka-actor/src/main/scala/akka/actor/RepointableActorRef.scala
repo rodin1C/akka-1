@@ -74,7 +74,7 @@ private[akka] class RepointableActorRef(
       case null ⇒
         swapCell(new UnstartedCell(system, this, props, supervisor))
         swapLookup(underlying)
-        supervisor.sendSystemMessage(Supervise(this, async, path.uid))
+        supervisor.sendSystemMessage(Supervise(this, async))
         if (!async) point()
         this
       case other ⇒ throw new IllegalStateException("initialize called more than once!")
