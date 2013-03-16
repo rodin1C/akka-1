@@ -884,6 +884,7 @@ object Dependencies {
 
     // Spring Sample
     val javaxInject   = "javax.inject"                % "javax.inject"                 % "1"                // ApacheV2
+    val jsr250        = "javax.annotation"            % "jsr250-api"                   % "1.0"              // CDDL v1.0
     val springContext = "org.springframework"         % "spring-context"               % "3.2.1.RELEASE"    // ApacheV2
 
     // Cluster Sample
@@ -942,7 +943,7 @@ object Dependencies {
 
   val camelSample = Seq(camelJetty)
 
-  val springSample = Seq(javaxInject, springContext)
+  val springSample = Seq(javaxInject, jsr250,   springContext)
 
   val osgi = Seq(osgiCore, osgiCompendium, Test.logback, Test.commonsIo, Test.pojosr, Test.tinybundles, Test.scalatest, Test.junit)
 

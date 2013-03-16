@@ -3,7 +3,8 @@
  */
 package sample.spring
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
+import akka.actor._
+import akka.pattern.gracefulStop
 import akka.japi.Creator
 import akka.pattern.ask
 import akka.util.Timeout
@@ -15,6 +16,7 @@ import scala.beans.BeanProperty
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+import javax.annotation.PreDestroy
 import javax.inject._
 
 import akka.spring.{ ScopedActor, SpringHelper }
@@ -25,63 +27,72 @@ object Main {
     // TODO: Programmatically register ActorScope
     // TODO: Maybe ensure that Actors can only have prototype scope, since refs should not be held
     try {
-      val system = ActorSystem()
-      try {
-        implicit val timeout = Timeout(2.seconds)
-
-        val hi = SpringHelper.createSimpleSpringConfiguredActor(system, context, "hi-actor")
-        val hello = SpringHelper.createSimpleSpringConfiguredActor(system, context, "hello-actor")
-        Await.result(hi ? Greet, 1.second)
-        Await.result(hello ? Greet, 1.second)
-
-        val resourceCtor = SpringHelper.createSimpleSpringConfiguredActor(system, context, classOf[ResourceHolderCtor])
-        val resourceProp = SpringHelper.createSimpleSpringConfiguredActor(system, context, classOf[ResourceHolderProp])
-        Await.result(resourceCtor ? ResourcePing, 1.second)
-        Await.result(resourceProp ? ResourcePing, 1.second)
-      } finally system.shutdown()
+      implicit val timeout = Timeout(5.seconds)
+      import IncrementService._
+      val incrementService = context.getBean(classOf[IncrementService])
+      val result = Await.result(incrementService.incrementer ? Increment(5), 6.seconds)
+      println(s"Result is: $result")
     } finally context.close()
   }
 }
 
-// Testing simple constructor dependency injection
+object AdditionService {
+  case class Add(a: Int, b: Int)
+  case class AddResult(x: Int)
+}
 
-case object Greet
-case object GreetDone
+@Named
+@Singleton
+class AdditionService @Inject() (arf: ActorSystem) {
+  import AdditionService._
 
-class GreetingActor(greeting: String) extends Actor {
-  def receive = {
-    case Greet ⇒ {
-      println(s"$greeting world!")
-      sender ! GreetDone
+  val adder = arf.actorOf(Props(new Actor {
+    def receive = {
+      case Add(a, b) ⇒ sender ! AddResult(a + b)
     }
+  }))
+
+  @PreDestroy
+  def shutdown() {
+    val stopped = gracefulStop(adder, 4.seconds)(arf)
+    Await.result(stopped, 5.seconds)
   }
 }
 
-// Testing injecting resources into an actor using the 'actor' scope for cleanup
-
-class Resource {
-  def destroy() { println("Destroying resource") }
+object IncrementService {
+  case class Increment(x: Int)
+  case class IncrementResult(x: Int)
 }
 
-case object ResourcePing
-case class ResourcePong(resource: Resource)
-
-// Create with constructor-based dependency injection
 @Named
-@org.springframework.context.annotation.Scope("prototype")
-class ResourceHolderCtor @Inject() (resource: Resource) extends ScopedActor {
-  def receive = {
-    case _ ⇒ sender ! ResourcePong(resource)
-  }
-}
+@Singleton
+class IncrementService @Inject() (arf: ActorSystem, additionService: AdditionService) {
+  import IncrementService._
 
-// Create with property-based dependency injection
-@Named
-@org.springframework.context.annotation.Scope("prototype")
-class ResourceHolderProp extends ScopedActor {
-  @Inject @BeanProperty
-  var resource: Resource = _
-  def receive = {
-    case ResourcePing ⇒ sender ! ResourcePong(resource)
+  val incrementer = arf.actorOf(Props(new Actor {
+    override def receive = {
+      case Increment(x) ⇒ {
+        val incrementSender = sender
+        // Start a little worker to handle the conversation with the adder
+        context.actorOf(Props(new Actor {
+          import AdditionService._
+          override def preStart() {
+            additionService.adder ! Add(x, 1)
+          }
+          def receive = {
+            case AddResult(y) ⇒ {
+              incrementSender ! IncrementResult(y) // TODO send from incrementer?
+              context.stop(self)
+            }
+          }
+        }))
+      }
+    }
+  }))
+
+  @PreDestroy
+  def shutdown() {
+    val stopped = gracefulStop(incrementer, 4.seconds)(arf)
+    Await.result(stopped, 5.seconds)
   }
 }
