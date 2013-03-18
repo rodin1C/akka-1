@@ -76,13 +76,13 @@ import scala.collection.JavaConverters
  * Two actor references are compared equal when they have the same path and point to
  * the same actor incarnation. A reference pointing to a terminated actor doesn't compare
  * equal to a reference pointing to another (re-created) actor with the same path.
- * ActorRefs acquired with `actorFor` doesn't always include the full information about the
- * underlying actor identity and therefore such references doesn't always compare equal
- * to references acquired with `actorOf`, `sender`, or `context.self`.
+ * Actor references acquired with `actorFor` doesn't always include the full information
+ * about the underlying actor identity and therefore such references doesn't always compare
+ * equal to references acquired with `actorOf`, `sender`, or `context.self`.
  *
  * If you need to keep track of actor references in a collection and don't care
  * about the exact actor incarnation you can use the ``ActorPath`` as key because
- * the unique id of the actor is not taken into account when comparing actor paths
+ * the unique id of the actor is not taken into account when comparing actor paths.
  */
 abstract class ActorRef extends java.lang.Comparable[ActorRef] with Serializable {
   scalaRef: InternalActorRef ⇒
@@ -408,8 +408,8 @@ private[akka] case class SerializedActorRef private (path: String) {
 private[akka] object SerializedActorRef {
   def apply(path: ActorPath): SerializedActorRef = {
     Serialization.currentTransportAddress.value match {
-      case null ⇒ new SerializedActorRef(path.toRawString)
-      case addr ⇒ new SerializedActorRef(path.toRawStringWithAddress(addr))
+      case null ⇒ new SerializedActorRef(path.toSerializationFormat)
+      case addr ⇒ new SerializedActorRef(path.toSerializationFormatWithAddress(addr))
     }
   }
 }

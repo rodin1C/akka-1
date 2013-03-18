@@ -111,7 +111,7 @@ sealed trait ActorPath extends Comparable[ActorPath] with Serializable {
    * This representation should be used as serialized
    * representation instead of `toString`.
    */
-  def toRawString: String
+  def toSerializationFormat: String
 
   /**
    * Generate full String representation including the uid for the actor cell
@@ -120,7 +120,7 @@ sealed trait ActorPath extends Comparable[ActorPath] with Serializable {
    * information. This representation should be used as serialized
    * representation instead of `toStringWithAddress`.
    */
-  def toRawStringWithAddress(address: Address): String
+  def toSerializationFormatWithAddress(address: Address): String
 
   /**
    * INTERNAL API
@@ -131,6 +131,7 @@ sealed trait ActorPath extends Comparable[ActorPath] with Serializable {
 
   /**
    * INTERNAL API
+   * Creates a new ActorPath with same elements but with the specified `uid`.
    */
   private[akka] def withUid(uid: Int): ActorPath
 
@@ -156,13 +157,13 @@ final case class RootActorPath(address: Address, name: String = "/") extends Act
 
   override val toString: String = address + name
 
-  override val toRawString: String = toString
+  override val toSerializationFormat: String = toString
 
   override def toStringWithAddress(addr: Address): String =
     if (address.host.isDefined) address + name
     else addr + name
 
-  override def toRawStringWithAddress(addr: Address): String = toStringWithAddress(addr)
+  override def toSerializationFormatWithAddress(addr: Address): String = toStringWithAddress(addr)
 
   override def compareTo(other: ActorPath): Int = other match {
     case r: RootActorPath  ⇒ toString compareTo r.toString // FIXME make this cheaper by comparing address and name in isolation
@@ -224,7 +225,7 @@ final class ChildActorPath private[akka] (val parent: ActorPath, val name: Strin
 
   override def toString: String = buildToString(new JStringBuilder(toStringLength)).toString
 
-  override def toRawString: String = {
+  override def toSerializationFormat: String = {
     val sb = buildToString(new JStringBuilder(toStringLength + 12))
     appendUidFragment(sb).toString
   }
@@ -233,7 +234,7 @@ final class ChildActorPath private[akka] (val parent: ActorPath, val name: Strin
 
   private val toStringOffset: Int = parent match {
     case r: RootActorPath  ⇒ r.address.toString.length + r.name.length
-    case c: ChildActorPath ⇒ c.toStringOffset + c.name.length + 1
+    case c: ChildActorPath ⇒ c.toStringLength + 1
   }
 
   private def buildToString(sb: JStringBuilder): JStringBuilder = {
@@ -258,7 +259,7 @@ final class ChildActorPath private[akka] (val parent: ActorPath, val name: Strin
   override def toStringWithAddress(addr: Address): String =
     buildToStringWithAddress(addr, new JStringBuilder(toStringLength)).toString
 
-  override def toRawStringWithAddress(addr: Address): String = {
+  override def toSerializationFormatWithAddress(addr: Address): String = {
     val sb = buildToStringWithAddress(addr, new JStringBuilder(toStringLength + 12))
     appendUidFragment(sb).toString
   }

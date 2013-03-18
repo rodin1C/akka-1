@@ -109,11 +109,11 @@ you might want to know how to serialize and deserialize them properly, here's th
 
 .. note::
   
-  ``ActorPath.toRawStringWithAddress`` differs from ``toString`` if the
+  ``ActorPath.toSerializationFormatWithAddress`` differs from ``toString`` if the
   address does not already have ``host`` and ``port`` components, i.e. it only
   inserts address information for local addresses. 
 
-  ``toRawStringWithAddress`` also adds the unique id of the actor, which will
+  ``toSerializationFormatWithAddress`` also adds the unique id of the actor, which will
   change when the actor is stopped and then created again with the same name.
   Sending messages to a reference pointing the old actor will not be delivered
   to the new actor. If you don't want this behavior, e.g. in case of long term

@@ -302,7 +302,7 @@ private[akka] class RemoteActorRefProvider(
     log.debug("[{}] Instantiating Remote Actor [{}]", rootPath, path)
 
     // we don’t wait for the ACK, because the remote end will process this command before any other message to the new actor
-    actorFor(RootActorPath(path.address) / "remote") ! DaemonMsgCreate(props, deploy, path.toRawString, supervisor)
+    actorFor(RootActorPath(path.address) / "remote") ! DaemonMsgCreate(props, deploy, path.toSerializationFormat, supervisor)
   }
 
   def getExternalAddressFor(addr: Address): Option[Address] = {

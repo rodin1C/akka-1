@@ -246,6 +246,27 @@ Summary: ``actorOf`` vs. ``actorFor``
   - ``actorFor`` only ever looks up an existing actor, i.e. does not create
     one.
 
+Actor Reference and Path Equality
+---------------------------------
+
+Equality of ``ActorRef`` match the intention that an ``ActorRef`` corresponds to
+the target actor instance. Two actor references are compared equal when they have
+the same path and point to the same actor incarnation. A reference pointing to a
+terminated actor doesn't compare equal to a reference pointing to another (re-created)
+actor with the same path. Note that a restart of an actor caused by a failure still 
+means that it is the same actor incarnation, i.e. a restart is not visible for the 
+consumer of the ``ActorRef``.
+
+Remote actor references acquired with ``actorFor`` doesn't include the full
+information about the underlying actor identity and therefore such references 
+doesn't compare equal to references acquired with ``actorOf``, ``sender``, 
+or ``context.self``. Because of this ``actorFor`` is deprecated in favor of
+``actorSelection``.
+
+If you need to keep track of actor references in a collection and don't care about
+the exact actor incarnation you can use the ``ActorPath`` as key, because the identifier
+of the target actor is not taken into account when comparing actor paths.
+
 Reusing Actor Paths
 -------------------
 
@@ -255,9 +276,9 @@ to come back to life again (since the actor life cycle does not allow this).
 While it is possible to create an actor at a later time with an identical
 path—simply due to it being impossible to enforce the opposite without keeping
 the set of all actors ever created available—this is not good practice: remote
-actor references which “died” suddenly start to work again, but without any
-guarantee of ordering between this transition and any other event, hence the
-new inhabitant of the path may receive messages which were destined for the
+actor references acquired with ``actorFor`` which “died” suddenly start to work
+again, but without any guarantee of ordering between this transition and any 
+other event, hence the new inhabitant of the path may receive messages which were destined for the
 previous tenant.
 
 It may be the right thing to do in very specific circumstances, but make sure

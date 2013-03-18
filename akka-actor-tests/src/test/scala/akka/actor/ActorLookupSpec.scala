@@ -186,7 +186,7 @@ class ActorLookupSpec extends AkkaSpec with DefaultTimeout {
       def check(looker: ActorRef, pathOf: ActorRef, result: ActorRef) {
         Await.result(looker ? LookupString(pathOf.path.toString), timeout.duration) must be === result
         // with uid
-        Await.result(looker ? LookupString(pathOf.path.toRawString), timeout.duration) must be === result
+        Await.result(looker ? LookupString(pathOf.path.toSerializationFormat), timeout.duration) must be === result
         // with trailing /
         Await.result(looker ? LookupString(pathOf.path.toString + "/"), timeout.duration) must be === result
       }
